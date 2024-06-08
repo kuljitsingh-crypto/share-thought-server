@@ -3,9 +3,10 @@
  * @param {string} options.userName
  * @param {string} options.link
  * @param {string|number} options.hours
+ * @param {string} options.platform
  */
 module.exports.emailVerifyMessage = (options) => {
-  const { userName, link, hours } = options;
+  const { userName, link, hours, platform } = options;
   const subject = "Email verification instructions";
   const msg = `<!DOCTYPE html>
   <html>
@@ -16,7 +17,7 @@ module.exports.emailVerifyMessage = (options) => {
     <body>
       <div>
         <h1 style="color:#444;">Verify your email address</h1>
-        <p style="font-size:20px;padding:16px 0px;">${userName}, to complete your signup to Share Thought, verify your email address by clicking the button below.</p>
+        <p style="font-size:20px;padding:16px 0px;">${userName}, to complete your signup to ${platform}, verify your email address by clicking the button below.</p>
         <p style="padding-bottom:16px;">
           <a href=${link} style="background-color:#007df2;padding:16px 48px;border-radius:8px;color:#fff;text-decoration:none !important;">Verify Email</a>
         </p>

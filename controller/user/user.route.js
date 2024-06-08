@@ -7,6 +7,8 @@ const {
   sendCsrfToken,
   userSignout,
   emailVerify,
+  recoverPassword,
+  RESET_TOKEN_EXPIRES_IN,
 } = require("./user.controller");
 const { emailAuth } = require("../../utill");
 const {
@@ -16,17 +18,23 @@ const {
   newCsrfTokenMiddleware,
   logoutMiddleware,
   validateTokenForAuthVerificationMiddleware,
+  resetPasswordMiddleware,
 } = emailAuth.middlewares();
 
 userRouter.get("/", getUserDetails);
-userRouter.get("/logout", logoutMiddleware(), userSignout);
 userRouter.get("/csrftoken", newCsrfTokenMiddleware(), sendCsrfToken);
 userRouter.get("/current-user", getCurrentUserMiddleware(), currentUser);
 userRouter.post("/login", loginMiddleware(), userLogin);
 userRouter.post("/signup", signupMiddleware(), userSignup);
+userRouter.get("/logout", logoutMiddleware(), userSignout);
 userRouter.post(
   "/email-verify",
   validateTokenForAuthVerificationMiddleware(),
   emailVerify
+);
+userRouter.post(
+  "/recover-password",
+  resetPasswordMiddleware({ expiresIn: RESET_TOKEN_EXPIRES_IN }),
+  recoverPassword
 );
 module.exports = userRouter;

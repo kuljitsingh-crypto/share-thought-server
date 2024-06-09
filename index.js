@@ -3,6 +3,7 @@ const express = require("express");
 const router = require("./apiRouter");
 const cookieParser = require("cookie-parser");
 const { wellKnownRouter } = require("./wellKnownRouter");
+const passport = require("passport");
 const app = express();
 const PORT = parseInt(process.env.PORT || "3500", 10);
 
@@ -13,6 +14,8 @@ app.use(
 app.use("/.well-known", wellKnownRouter);
 // It is required to read user Ip address.
 app.set("trust proxy", true);
+
+app.use(passport.initialize());
 app.use("/api", router);
 
 app.listen(PORT, () => {

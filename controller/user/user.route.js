@@ -9,8 +9,14 @@ const {
   emailVerify,
   recoverPassword,
   RESET_TOKEN_EXPIRES_IN,
+  resetPassword,
+  googleLogin,
 } = require("./user.controller");
 const { emailAuth } = require("../../utill");
+const {
+  googleAuthenticate,
+  googleAuthenticateCallback,
+} = require("./google-login");
 const {
   loginMiddleware,
   signupMiddleware,
@@ -19,6 +25,7 @@ const {
   logoutMiddleware,
   validateTokenForAuthVerificationMiddleware,
   resetPasswordMiddleware,
+  resetPasswordVerifyMiddleware,
 } = emailAuth.middlewares();
 
 userRouter.get("/", getUserDetails);
@@ -36,5 +43,16 @@ userRouter.post(
   "/recover-password",
   resetPasswordMiddleware({ expiresIn: RESET_TOKEN_EXPIRES_IN }),
   recoverPassword
+);
+userRouter.post(
+  "/reset-password",
+  resetPasswordVerifyMiddleware(),
+  resetPassword
+);
+userRouter.get("/google-login", googleAuthenticate);
+userRouter.get(
+  "/google-login/callback",
+  googleAuthenticateCallback,
+  ...googleLogin
 );
 module.exports = userRouter;

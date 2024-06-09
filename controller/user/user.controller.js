@@ -3,9 +3,65 @@ const {
   passwordResetMessage,
 } = require("../../mailMessages");
 const { emailAuth, appBaseUrl, sendEmail } = require("../../utill");
-const { generateAuthVerificationToken } = emailAuth.helpers();
+const { generateAuthVerificationToken, getUserDetails } = emailAuth.helpers();
+const { signupMiddleware, loginMiddleware } = emailAuth.middlewares();
 const TOKEN_EXPIRES_IN = "48h";
 const platform = process.env.PLATFORM_NAME;
+
+const encodeUserProfileImage = (profileImage) => {
+  if (!!profileImage && typeof profileImage === "string")
+    return encodeURIComponent(profileImage);
+  return null;
+};
+const decodeUserProfileImage = (profileImage) => {
+  if (!!profileImage && typeof profileImage === "string")
+    return decodeURIComponent(profileImage);
+  return null;
+};
+const processGoogleUserDataBeforeSignup = (req, res, next) => {
+  const user = req.user;
+  if (!user) res.status(401).send("Invalid details");
+  const { googleId, firstName, lastName, email, picture, verified } = user;
+  const signupData = {
+    email,
+    password: googleId,
+    publicData: {
+      firstName,
+      lastName,
+      profileImage: encodeUserProfileImage(picture),
+    },
+    verified,
+  };
+  req.body = signupData;
+  next();
+};
+
+const googleSignupMiddlewareWrapper = async (req, res, next) => {
+  const { verified, ...restBody } = req.body;
+  const { email } = restBody;
+  req.body = restBody;
+  const savedUser = await getUserDetails({
+    query: { auth: email },
+    throwErrOnUserNotFound: false,
+    userNotFoundMsg: "",
+  });
+  if (!savedUser) {
+    signupMiddleware({ isCurrentUserVerified: verified })(req, res, next);
+  } else {
+    next();
+  }
+};
+
+const processGoogleUserDataBeforeLogin = (req, res, next) => {
+  const requestBody = req.body;
+  const { email, password } = requestBody;
+  req.body = { email, password };
+  next();
+};
+
+const redirectUserAfterLogin = (req, res) => {
+  res.redirect("/api/user/current-user");
+};
 
 module.exports.RESET_TOKEN_EXPIRES_IN = "2h";
 
@@ -20,7 +76,7 @@ module.exports.defaultResponse = (req, res) => {
 module.exports.getUserDetails = (req, res) => {
   console.log("request", req.query);
 
-  res.send({ user: true });
+  res.send({ user: req.query });
 };
 
 module.exports.userLogin = (req, res) => {
@@ -56,8 +112,11 @@ module.exports.userSignup = async (req, res) => {
 
 module.exports.currentUser = (req, res) => {
   try {
-    console.log(req.user);
-    res.status(200).send(req.user);
+    const user = req.user;
+    user.publicData.profileImage = decodeUserProfileImage(
+      user.publicData.profileImage
+    );
+    res.status(200).send(user);
   } catch (e) {
     res.sendStatus(e?.status || 500);
   }
@@ -95,3 +154,19 @@ module.exports.recoverPassword = async (req, res) => {
     res.sendStatus(e?.status || 500);
   }
 };
+module.exports.resetPassword = async (req, res) => {
+  try {
+    const csrfToken = req.csrfToken;
+    res.status(200).send({ csrfToken });
+  } catch (e) {
+    res.sendStatus(e?.status || 500);
+  }
+};
+
+module.exports.googleLogin = [
+  processGoogleUserDataBeforeSignup,
+  googleSignupMiddlewareWrapper,
+  processGoogleUserDataBeforeLogin,
+  loginMiddleware(),
+  redirectUserAfterLogin,
+];

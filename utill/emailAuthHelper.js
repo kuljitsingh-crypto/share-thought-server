@@ -12,6 +12,7 @@ const emailAuth = new PlugableAuthentication({
   encryptSecret: encryptKey,
   jwtSecret: secrtKey,
   disableIpMismatchValidation: true,
+  disableCSRFTokenValidation:true
 });
 
 module.exports = emailAuth;

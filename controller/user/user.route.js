@@ -10,13 +10,18 @@ const {
   recoverPassword,
   RESET_TOKEN_EXPIRES_IN,
   resetPassword,
-  googleLogin,
+  appUserGoogleLogin,
+  appUserFacebookLogin,
 } = require("./user.controller");
-const { emailAuth } = require("../../utill");
+const { emailAuth, appBaseUrl } = require("../../utill");
 const {
   googleAuthenticate,
   googleAuthenticateCallback,
 } = require("./google-login");
+const {
+  facebookAuthenticate,
+  facebookAuthenticateCallback,
+} = require("./facebook-login");
 const {
   loginMiddleware,
   signupMiddleware,
@@ -26,6 +31,7 @@ const {
   validateTokenForAuthVerificationMiddleware,
   resetPasswordMiddleware,
   resetPasswordVerifyMiddleware,
+  thirdPartyLoginMiddleware,
 } = emailAuth.middlewares();
 
 userRouter.get("/", getUserDetails);
@@ -53,6 +59,19 @@ userRouter.get("/google-login", googleAuthenticate);
 userRouter.get(
   "/google-login/callback",
   googleAuthenticateCallback,
-  ...googleLogin
+  thirdPartyLoginMiddleware({
+    redirectpath: "/api/user/current-user",
+  })
 );
+userRouter.post("/app/google-login", appUserGoogleLogin);
+userRouter.get("/facebook-login", facebookAuthenticate);
+userRouter.get(
+  "/facebook-login/callback",
+  facebookAuthenticateCallback,
+  thirdPartyLoginMiddleware({
+    redirectpath: "/api/user/current-user",
+  })
+);
+userRouter.post("/app/facebook-login", appUserFacebookLogin);
+
 module.exports = userRouter;

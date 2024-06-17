@@ -11,8 +11,8 @@ const emailAuth = new PlugableAuthentication({
   cookieId,
   encryptSecret: encryptKey,
   jwtSecret: secrtKey,
+  thirdPartyLoginOption: { google: {}, facebook: {} },
   disableIpMismatchValidation: true,
-  disableCSRFTokenValidation:true
 });
 
 module.exports = emailAuth;

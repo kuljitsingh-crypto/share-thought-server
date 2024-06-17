@@ -16,13 +16,20 @@ const verifyCallback = (request, accessToken, refreshToken, profile, done) => {
   const { given_name, family_name, picture, email, email_verified } =
     profile._json;
   const userData = {
-    googleId: profile.id,
-    displayName: profile.displayName,
-    firstName: given_name,
-    lastName: family_name,
-    verified: email_verified,
     email: email,
-    picture: picture,
+    publicData: {
+      profileImage: picture,
+      firstName: given_name,
+      lastName: family_name,
+    },
+
+    metadata: {
+      adminOnly: {
+        googleId: profile.id,
+      },
+    },
+    thirdPartyProvider: "google",
+    verified: email_verified,
   };
 
   done(null, userData);

@@ -1,68 +1,18 @@
+const { OAuth2Client } = require("google-auth-library");
 const {
   emailVerifyMessage,
   passwordResetMessage,
 } = require("../../mailMessages");
 const { emailAuth, appBaseUrl, sendEmail } = require("../../utill");
-const { generateAuthVerificationToken, getUserDetails } = emailAuth.helpers();
+const { default: axios } = require("axios");
+const { generateAuthVerificationToken, thirdPartyLogin } = emailAuth.helpers();
 const { signupMiddleware, loginMiddleware } = emailAuth.middlewares();
 const TOKEN_EXPIRES_IN = "48h";
 const platform = process.env.PLATFORM_NAME;
+const googleLoginIdForApp = process.env.GOOGLE_APP_LOGIN_ID;
+const facebookAppDataFetchUrl = process.env.FACEBOOK_APP_URL;
 
-const encodeUserProfileImage = (profileImage) => {
-  if (!!profileImage && typeof profileImage === "string")
-    return encodeURIComponent(profileImage);
-  return null;
-};
-const decodeUserProfileImage = (profileImage) => {
-  if (!!profileImage && typeof profileImage === "string")
-    return decodeURIComponent(profileImage);
-  return null;
-};
-const processGoogleUserDataBeforeSignup = (req, res, next) => {
-  const user = req.user;
-  if (!user) res.status(401).send("Invalid details");
-  const { googleId, firstName, lastName, email, picture, verified } = user;
-  const signupData = {
-    email,
-    password: googleId,
-    publicData: {
-      firstName,
-      lastName,
-      profileImage: encodeUserProfileImage(picture),
-    },
-    verified,
-  };
-  req.body = signupData;
-  next();
-};
-
-const googleSignupMiddlewareWrapper = async (req, res, next) => {
-  const { verified, ...restBody } = req.body;
-  const { email } = restBody;
-  req.body = restBody;
-  const savedUser = await getUserDetails({
-    query: { auth: email },
-    throwErrOnUserNotFound: false,
-    userNotFoundMsg: "",
-  });
-  if (!savedUser) {
-    signupMiddleware({ isCurrentUserVerified: verified })(req, res, next);
-  } else {
-    next();
-  }
-};
-
-const processGoogleUserDataBeforeLogin = (req, res, next) => {
-  const requestBody = req.body;
-  const { email, password } = requestBody;
-  req.body = { email, password };
-  next();
-};
-
-const redirectUserAfterLogin = (req, res) => {
-  res.redirect("/api/user/current-user");
-};
-
+const googleAuthClient = new OAuth2Client();
 module.exports.RESET_TOKEN_EXPIRES_IN = "2h";
 
 module.exports.defaultResponse = (req, res) => {
@@ -74,8 +24,6 @@ module.exports.defaultResponse = (req, res) => {
 };
 
 module.exports.getUserDetails = (req, res) => {
-  console.log("request", req.query);
-
   res.send({ user: req.query });
 };
 
@@ -113,9 +61,6 @@ module.exports.userSignup = async (req, res) => {
 module.exports.currentUser = (req, res) => {
   try {
     const user = req.user;
-    user.publicData.profileImage = decodeUserProfileImage(
-      user.publicData.profileImage
-    );
     res.status(200).send(user);
   } catch (e) {
     res.sendStatus(e?.status || 500);
@@ -163,10 +108,73 @@ module.exports.resetPassword = async (req, res) => {
   }
 };
 
-module.exports.googleLogin = [
-  processGoogleUserDataBeforeSignup,
-  googleSignupMiddlewareWrapper,
-  processGoogleUserDataBeforeLogin,
-  loginMiddleware(),
-  redirectUserAfterLogin,
-];
+module.exports.appUserGoogleLogin = async (req, res) => {
+  try {
+    const { idToken } = req.body;
+    const ticket = await googleAuthClient.verifyIdToken({
+      idToken: idToken,
+      audience: googleLoginIdForApp,
+    });
+    const payload = ticket.getPayload();
+    const { sub, email, email_verified, picture, given_name, family_name } =
+      payload;
+    const userData = {
+      email: email,
+      publicData: {
+        profileImage: picture,
+        firstName: given_name,
+        lastName: family_name,
+      },
+      metadata: {
+        adminOnly: {
+          googleId: sub,
+        },
+      },
+      thirdPartyProvider: "google",
+      verified: email_verified,
+    };
+    req.body = userData;
+    const { csrfToken } = await thirdPartyLogin(req, res);
+    res.status(200).send({ csrfToken });
+  } catch (err) {
+    const status = err.status || 500;
+    if (err.message) {
+      return res.status(status).send(err.message);
+    }
+    res.sendStatus(status);
+  }
+};
+
+module.exports.appUserFacebookLogin = async (req, res) => {
+  try {
+    const { accessToken } = req.body;
+    const url = `${facebookAppDataFetchUrl}?fields=id,name,first_name,last_name,picture,email&access_token=${accessToken}`;
+    const resp = await axios.get(url);
+    const { id, first_name, last_name, email, picture } = resp.data;
+    const userData = {
+      email: email,
+      publicData: {
+        profileImage: picture?.data?.url || null,
+        firstName: first_name,
+        lastName: last_name,
+      },
+      metadata: {
+        adminOnly: {
+          googleId: id,
+        },
+      },
+      thirdPartyProvider: "facebook",
+      verified: true,
+    };
+    req.body = userData;
+    const { csrfToken } = await thirdPartyLogin(req, res);
+    res.status(200).send({ csrfToken });
+  } catch (err) {
+    console.log(err);
+    const status = err.status || 500;
+    if (err.message) {
+      return res.status(status).send(err.message);
+    }
+    res.sendStatus(status);
+  }
+};
